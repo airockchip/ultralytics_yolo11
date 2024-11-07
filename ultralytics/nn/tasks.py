@@ -204,13 +204,15 @@ class BaseModel(nn.Module):
                 if isinstance(m, (Conv, Conv2, DWConv)) and hasattr(m, "bn"):
                     if isinstance(m, Conv2):
                         m.fuse_convs()
-                    m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
-                    delattr(m, "bn")  # remove batchnorm
-                    m.forward = m.forward_fuse  # update forward
+                    if not isinstance(m.bn, nn.GroupNorm):
+                        m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
+                        delattr(m, "bn")  # remove batchnorm
+                        m.forward = m.forward_fuse  # update forward
                 if isinstance(m, ConvTranspose) and hasattr(m, "bn"):
-                    m.conv_transpose = fuse_deconv_and_bn(m.conv_transpose, m.bn)
-                    delattr(m, "bn")  # remove batchnorm
-                    m.forward = m.forward_fuse  # update forward
+                    if not isinstance(m.bn, nn.GroupNorm):
+                        m.conv_transpose = fuse_deconv_and_bn(m.conv_transpose, m.bn)
+                        delattr(m, "bn")  # remove batchnorm
+                        m.forward = m.forward_fuse  # update forward
                 if isinstance(m, RepConv):
                     m.fuse_convs()
                     m.forward = m.forward_fuse  # update forward
@@ -931,7 +933,7 @@ def attempt_load_one_weight(weight, device=None, inplace=True, fuse=False):
     return model, ckpt
 
 
-def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
+def parse_model(d, ch, verbose=True, norm_type="none"):  # model_dict, input_channels(3), normalization type
     """Parse a YOLO model.yaml dictionary into a PyTorch model."""
     import ast
 
@@ -1008,7 +1010,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                 args[2] = int(
                     max(round(min(args[2], max_channels // 2 // 32)) * width, 1) if args[2] > 1 else args[2]
                 )  # num heads
-
+            norm_type = d.get("norm_type", "none")  # Default to 'none' if not specified
             args = [c1, c2, *args[1:]]
             if m in {
                 BottleneckCSP,
@@ -1044,6 +1046,8 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             c2 = args[1] if args[3] else args[1] * 4
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
+        elif m is nn.GroupNorm:
+            args = [int(ch[f] / 2), ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
         elif m in {Detect, WorldDetect, Segment, Pose, OBB, ImagePoolingAttn, v10Detect}:
@@ -1063,7 +1067,14 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         else:
             c2 = ch[f]
 
-        m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
+        try:
+            m_ = (
+                nn.Sequential(*(m(*args, norm_type=norm_type) for _ in range(n)))
+                if n > 1
+                else m(*args, norm_type=norm_type)
+            )
+        except TypeError:
+            m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)
         t = str(m)[8:-2].replace("__main__.", "")  # module type
         m_.np = sum(x.numel() for x in m_.parameters())  # number params
         m_.i, m_.f, m_.type = i, f, t  # attach index, 'from' index, type
