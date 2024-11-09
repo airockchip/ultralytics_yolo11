@@ -2,6 +2,7 @@
 
 from .ai_gym import AIGym
 from .analytics import Analytics
+from .crowd_density_estimation import CrowdDensityEstimation
 from .distance_calculation import DistanceCalculation
 from .heatmap import Heatmap
 from .object_counter import ObjectCounter
@@ -21,4 +22,5 @@ __all__ = (
     "SpeedEstimator",
     "Analytics",
     "inference",
+    "CrowdDensityEstimation",
 )
