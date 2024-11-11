@@ -36,7 +36,20 @@ Monitoring workouts through pose estimation with [Ultralytics YOLO11](https://gi
 
 !!! example "Workouts Monitoring Example"
 
-    === "Workouts Monitoring"
+    === "CLI"
+
+        ```bash
+        # Run a workout example
+        yolo solutions workout show=True
+
+        # Pass a source video
+        yolo solutions workout source="path/to/video/file.mp4"
+
+        # Use keypoints for pushups
+        yolo solutions workout kpts=[6, 8, 10]
+        ```
+
+    === "Python"
 
         ```python
         import cv2
@@ -106,6 +119,7 @@ Monitoring workouts through pose estimation with [Ultralytics YOLO11](https://gi
 | `show`       | `bool`  | `False` | Flag to display the image.                                                             |
 | `up_angle`   | `float` | `145.0` | Angle threshold for the 'up' pose.                                                     |
 | `down_angle` | `float` | `90.0`  | Angle threshold for the 'down' pose.                                                   |
+| `model`      | `str`   | `None`  | Path to Ultralytics YOLO Pose Model File                                               |
 
 ### Arguments `model.predict`
 
