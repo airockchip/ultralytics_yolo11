@@ -458,6 +458,14 @@ class Exporter:
             except Exception as e:
                 LOGGER.warning(f"{prefix} simplifier failure: {e}")
 
+        # Half precision
+        if self.args.half:
+            check_requirements("onnxconverter-common")
+            from onnxconverter_common import float16
+
+            f = f"{str(self.file.stem)}_half.onnx"
+            model_onnx = float16.convert_float_to_float16(model_onnx)
+
         # Metadata
         for k, v in self.metadata.items():
             meta = model_onnx.metadata_props.add()
